@@ -3,118 +3,146 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Textgraphy MVP</title>
+  <title>Semantic Camera</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
-<body>
-  <div class="app">
-    <header class="topbar">
-      <div class="brand">
-        <div class="lens-icon"></div>
+<body class="color-on" data-issue="none">
+  <div class="camera-body">
+    <header class="camera-deck">
+      <div class="camera-mark" aria-label="Semantic Camera">
+        <span class="record-light"></span>
         <div>
-          <div class="eyebrow">TEXTGRAPHY MVP</div>
-          <h1>Semantic Depth of Field</h1>
+          <span class="micro-label">SEMANTIC CAMERA</span>
+          <strong>TEXT / 01</strong>
         </div>
       </div>
 
-      <div class="controls">
-        <div class="control">
-          <span class="label">FRAME</span>
-          <div class="segmented">
-            <button data-frame="paragraph">Paragraph</button>
-            <button data-frame="section">Section</button>
-            <button data-frame="document" class="active">Document</button>
-          </div>
+      <div class="camera-controls">
+        <div class="control-stack">
+          <span class="micro-label">FOCUS MODE</span>
+          <button id="intentDial" class="dial-control" type="button" aria-label="Change focal intent">
+            <span class="dial intent-dial" aria-hidden="true"><span class="dial-mark"></span></span>
+            <span id="intentValue" class="control-value">Auto</span>
+          </button>
         </div>
 
-        <div class="control aperture-control">
-          <span class="label">APERTURE</span>
-          <div class="slider-row">
-            <span>Shallow</span>
-            <input id="aperture" type="range" min="0" max="100" value="48" />
-            <span>Deep</span>
-          </div>
-          <div class="meta-row">
-            <span id="thresholdText">threshold 0.66</span>
-            <span id="focusCount">0 in focus</span>
-          </div>
+        <div class="control-stack">
+          <span class="micro-label">FRAME</span>
+          <button id="frameDial" class="dial-control" type="button" aria-label="Change frame">
+            <span class="dial" aria-hidden="true"><span class="dial-mark"></span></span>
+            <span id="frameValue" class="control-value">Document</span>
+          </button>
         </div>
 
-        <button id="shutter" class="shutter">
+        <div class="control-stack">
+          <span class="micro-label">APERTURE</span>
+          <button id="apertureDial" class="dial-control" type="button" aria-label="Change semantic aperture">
+            <span class="dial aperture-dial" aria-hidden="true"><span class="dial-mark"></span></span>
+            <span id="depthValue" class="control-value">f/5.6 · Medium</span>
+          </button>
+        </div>
+
+        <div class="control-stack color-control">
+          <span class="micro-label">COLOR CUES</span>
+          <button id="colorToggle" class="film-switch" type="button" aria-pressed="true">
+            <span class="switch-track"><span class="switch-knob"></span></span>
+            <span id="colorModeValue" class="control-value">Color</span>
+          </button>
+        </div>
+
+        <button id="shutter" class="shutter" type="button">
           <span class="shutter-ring"><span class="shutter-core"></span></span>
-          <span>SHUTTER</span>
+          <span class="micro-label">SHUTTER</span>
         </button>
       </div>
     </header>
 
-    <main>
-      <div class="hintbar">
-        <div>
-          <span class="hint-title">Current issue</span>
-          <strong id="issueTitle">Move the lens and click a sentence</strong>
-        </div>
-        <div class="hint">
-          Mouse = move lens · Click = focus · Shift+Click = include/exclude
-        </div>
-      </div>
-
-      <div class="layout">
-        <section class="paper-shell">
-          <div class="paper">
-            <div class="paper-head">
-              <span>Draft manuscript</span>
-              <span class="mock">Mock semantic model</span>
-            </div>
-
-            <div id="editor" class="editor">
-              <div id="baseLayer" class="text-layer base-layer"></div>
-              <div id="lensLayer" class="text-layer lens-layer"></div>
-
-              <div id="lensRing" class="lens-ring">
-                <div class="crosshair h"></div>
-                <div class="crosshair v"></div>
-                <div class="lens-label">FOCUS</div>
-              </div>
-            </div>
+    <main class="camera-main">
+      <section class="viewfinder-shell">
+        <div class="viewfinder-hud hud-top">
+          <div class="hud-block">
+            <span class="micro-label">FOCAL INTENT</span>
+            <strong id="issueTitle">Select a sentence to focus</strong>
           </div>
-        </section>
-
-        <aside class="side">
-          <section class="panel">
-            <div class="panel-title">Current frame</div>
-            <div class="kv"><span>Frame</span><strong id="frameValue">Document</strong></div>
-            <div class="kv"><span>Depth</span><strong id="depthValue">Medium</strong></div>
-            <div class="kv"><span>Focal sentence</span><strong id="focusValue">—</strong></div>
-          </section>
-
-          <section class="panel">
-            <div class="panel-title">In-focus instances</div>
-            <div id="instanceList" class="instance-list empty">Set a focus first.</div>
-          </section>
-
-          <section class="panel note">
-            <div class="panel-title">What this tests</div>
-            <p>
-              Aperture changes the model's boundary of “what counts as related”
-              before any rewrite occurs. The writer can see and correct that
-              boundary instead of only reviewing AI output afterward.
-            </p>
-          </section>
-        </aside>
-      </div>
-
-      <section id="contactSheet" class="contact-sheet hidden">
-        <div class="contact-head">
-          <div>
-            <div class="label">CAPTURE</div>
-            <h2>Revision contact sheet</h2>
+          <div class="hud-readout">
+            <span><b id="focusValue">—</b> SUBJECT</span>
+            <span><b id="focusCount">0</b> IN PLANE</span>
+            <span><b id="toneValue">—</b> TONE</span>
+            <span class="color-readout"><i></i><b id="colorHudValue">COLOR</b></span>
           </div>
-          <button id="closeSheet" class="ghost">Close</button>
         </div>
-        <div id="revisionCards" class="revision-cards"></div>
+
+        <div id="toneStrip" class="tone-strip hidden" aria-label="Tone film strip">
+          <div class="tone-strip-title">
+            <span class="micro-label">TONE FILM</span>
+            <strong id="tonePreviewValue">Choose a treatment</strong>
+          </div>
+          <div class="tone-options">
+            <button class="tone-option clinical" type="button" data-tone="clinical">
+              <i></i><span>Clinical</span><small>Detached</small>
+            </button>
+            <button class="tone-option restrained" type="button" data-tone="restrained">
+              <i></i><span>Restrained</span><small>Formal</small>
+            </button>
+            <button class="tone-option balanced" type="button" data-tone="balanced">
+              <i></i><span>Balanced</span><small>Neutral</small>
+            </button>
+            <button class="tone-option warm" type="button" data-tone="warm">
+              <i></i><span>Warm</span><small>Personal</small>
+            </button>
+            <button class="tone-option expressive" type="button" data-tone="expressive">
+              <i></i><span>Expressive</span><small>Poetic</small>
+            </button>
+          </div>
+        </div>
+
+        <div id="editor" class="editor" tabindex="0" aria-label="Semantic camera viewfinder">
+          <div id="baseLayer" class="text-layer base-layer"></div>
+          <div id="lensLayer" class="text-layer lens-layer" aria-hidden="true"></div>
+
+          <div id="lensRing" class="lens-ring" aria-hidden="true">
+            <span class="corner top-left"></span>
+            <span class="corner top-right"></span>
+            <span class="corner bottom-left"></span>
+            <span class="corner bottom-right"></span>
+            <span class="crosshair horizontal"></span>
+            <span class="crosshair vertical"></span>
+            <span id="lensDepth" class="lens-readout">f/5.6</span>
+          </div>
+        </div>
+
+        <div class="viewfinder-hud hud-bottom">
+          <span><kbd>CTRL</kbd> + MOVE &nbsp; REFRAME</span>
+          <span>WHEEL &nbsp; APERTURE</span>
+          <span>CLICK &nbsp; SET FOCUS</span>
+          <span>FOCUS DIAL &nbsp; CHANGE INTENT</span>
+          <span><kbd>SHIFT</kbd> + CLICK &nbsp; KEEP / DROP</span>
+          <span><kbd>SHIFT</kbd> + WHEEL &nbsp; SCROLL</span>
+        </div>
       </section>
     </main>
   </div>
+
+  <section id="contactSheet" class="contact-sheet hidden" role="dialog" aria-modal="true" aria-labelledby="contactTitle">
+    <div class="contact-frame">
+      <header class="contact-head">
+        <div>
+          <span class="micro-label">CAPTURE 01</span>
+          <h1 id="contactTitle">Choose a take</h1>
+          <p id="capturedSummary">Captured semantic frame</p>
+        </div>
+        <button id="closeSheet" class="camera-button" type="button">Retake</button>
+      </header>
+
+      <div id="capturedStrip" class="captured-strip"></div>
+      <div id="revisionCards" class="revision-cards"></div>
+
+      <footer class="contact-actions">
+        <span id="takeHint">Balanced take selected</span>
+        <button id="useTake" class="use-take" type="button">USE THIS TAKE</button>
+      </footer>
+    </div>
+  </section>
 
   <script src="app.js"></script>
 </body>
