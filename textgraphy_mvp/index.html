@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Semantic Camera</title>
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="pano.css" />
 </head>
 <body class="color-on" data-issue="none">
   <div class="camera-body">
@@ -13,13 +14,13 @@
         <span class="record-light"></span>
         <div>
           <span class="micro-label">SEMANTIC CAMERA</span>
-          <strong>TEXT / 01</strong>
+          <strong>TEXT / 02</strong>
         </div>
       </div>
 
       <div class="camera-controls">
         <div class="control-stack">
-          <span class="micro-label">FOCUS MODE</span>
+          <span class="micro-label">FOLLOW</span>
           <button id="intentDial" class="dial-control" type="button" aria-label="Change focal intent">
             <span class="dial intent-dial" aria-hidden="true"><span class="dial-mark"></span></span>
             <span id="intentValue" class="control-value">Auto</span>
@@ -50,7 +51,7 @@
           </button>
         </div>
 
-        <button id="shutter" class="shutter" type="button">
+        <button id="shutter" class="shutter" type="button" aria-label="Apply preview and capture" disabled>
           <span class="shutter-ring"><span class="shutter-core"></span></span>
           <span class="micro-label">SHUTTER</span>
         </button>
@@ -58,10 +59,22 @@
     </header>
 
     <main class="camera-main">
+      <nav class="session-bar" aria-label="Camera session">
+        <div class="mode-switch" aria-label="Camera mode">
+          <button id="focusModeBtn" type="button" class="active" aria-pressed="true">FOCUS + STYLE</button>
+          <button id="panoModeBtn" type="button" aria-pressed="false">PANO</button>
+        </div>
+        <span class="demo-label" title="This prototype uses a prepared manuscript, relatedness scores and wording examples. No AI service is connected.">EXAMPLE MANUSCRIPT</span>
+        <div class="session-actions">
+          <button id="undoBtn" type="button" class="text-button" disabled>Undo</button>
+          <button id="redoBtn" type="button" class="text-button" disabled>Redo</button>
+          <button id="filmBtn" type="button" class="camera-button" aria-expanded="false" aria-controls="filmDrawer">FILM <b id="filmCount">00</b></button>
+        </div>
+      </nav>
       <section class="viewfinder-shell">
         <div class="viewfinder-hud hud-top">
           <div class="hud-block">
-            <span class="micro-label">FOCAL INTENT</span>
+            <span id="hudLabel" class="micro-label">FOCAL INTENT</span>
             <strong id="issueTitle">Select a sentence to focus</strong>
           </div>
           <div class="hud-readout">
@@ -72,10 +85,22 @@
           </div>
         </div>
 
+        <div id="focusTools" class="focus-tools hidden">
+          <div class="intent-options" aria-label="Relationship to follow">
+            <span class="micro-label">FOLLOW</span>
+            <button type="button" data-intent="absolute">Claim strength</button>
+            <button type="button" data-intent="scope">Revision scope</button>
+            <button type="button" data-intent="transition">Argument flow</button>
+          </div>
+          <button id="backFocus" class="text-button hidden" type="button">Previous focus</button>
+          <button id="editFrame" type="button" class="text-button" aria-pressed="false">Adjust selection</button>
+        </div>
+
         <div id="toneStrip" class="tone-strip hidden" aria-label="Tone film strip">
           <div class="tone-strip-title">
             <span class="micro-label">TONE FILM</span>
             <strong id="tonePreviewValue">Choose a treatment</strong>
+            <span id="previewHint" class="preview-hint">Preview first. Shutter to apply.</span>
           </div>
           <div class="tone-options">
             <button class="tone-option clinical" type="button" data-tone="clinical">
@@ -96,6 +121,14 @@
           </div>
         </div>
 
+        <div id="frameTray" class="frame-tray hidden">
+          <div class="frame-tray-head"><span>Click a sentence to keep or leave it out. The focal sentence stays included.</span><button id="resetSelection" class="text-button" type="button">Reset selection</button></div>
+          <div id="frameMembers" class="frame-members"></div>
+        </div>
+
+        <section id="panoPanel" class="pano-panel hidden"></section>
+
+        <div class="editor-wrap">
         <div id="editor" class="editor" tabindex="0" aria-label="Semantic camera viewfinder">
           <div id="baseLayer" class="text-layer base-layer"></div>
           <div id="lensLayer" class="text-layer lens-layer" aria-hidden="true"></div>
@@ -110,12 +143,20 @@
             <span id="lensDepth" class="lens-readout">f/5.6</span>
           </div>
         </div>
+        <nav id="focusMap" class="focus-map" aria-label="Sentence map"></nav>
+        </div>
+
+        <div class="exposure-bar">
+          <span id="exposureState" class="exposure-state">READY</span>
+          <span id="exposureSummary">Focus a sentence, choose a tone, then press the shutter.</span>
+          <button id="discardPreview" class="text-button hidden" type="button">Discard preview</button>
+          <button id="reviewBtn" class="text-button hidden" type="button">Review changes</button>
+        </div>
 
         <div class="viewfinder-hud hud-bottom">
-          <span><kbd>CTRL</kbd> + MOVE &nbsp; REFRAME</span>
-          <span>WHEEL &nbsp; APERTURE</span>
+          <span><kbd>CTRL</kbd> + MOVE &nbsp; INSPECT</span>
+          <button id="wheelMode" class="text-button" type="button" aria-pressed="true">WHEEL: APERTURE</button>
           <span>CLICK &nbsp; SET FOCUS</span>
-          <span>FOCUS DIAL &nbsp; CHANGE INTENT</span>
           <span><kbd>SHIFT</kbd> + CLICK &nbsp; KEEP / DROP</span>
           <span><kbd>SHIFT</kbd> + WHEEL &nbsp; SCROLL</span>
         </div>
@@ -123,27 +164,17 @@
     </main>
   </div>
 
-  <section id="contactSheet" class="contact-sheet hidden" role="dialog" aria-modal="true" aria-labelledby="contactTitle">
-    <div class="contact-frame">
-      <header class="contact-head">
-        <div>
-          <span class="micro-label">CAPTURE 01</span>
-          <h1 id="contactTitle">Choose a take</h1>
-          <p id="capturedSummary">Captured semantic frame</p>
-        </div>
-        <button id="closeSheet" class="camera-button" type="button">Retake</button>
-      </header>
+  <aside id="filmDrawer" class="film-drawer hidden" aria-labelledby="filmTitle">
+    <header class="film-head"><div><span class="micro-label">YOUR CAPTURES</span><h2 id="filmTitle">Film</h2></div><button id="closeFilm" class="camera-button" type="button">Back to camera</button></header>
+    <p id="storageNote" class="storage-note">Saved in this browser.</p>
+    <div id="filmList" class="film-list"></div>
+    <div id="filmDetails" class="film-details"></div>
+  </aside>
+  <div id="announcement" class="sr-only" role="status" aria-live="polite"></div>
 
-      <div id="capturedStrip" class="captured-strip"></div>
-      <div id="revisionCards" class="revision-cards"></div>
-
-      <footer class="contact-actions">
-        <span id="takeHint">Balanced take selected</span>
-        <button id="useTake" class="use-take" type="button">USE THIS TAKE</button>
-      </footer>
-    </div>
-  </section>
-
+  <script src="camera-core.js"></script>
+  <script src="pano.js"></script>
   <script src="app.js"></script>
+  <script src="camera-ui.js"></script>
 </body>
 </html>

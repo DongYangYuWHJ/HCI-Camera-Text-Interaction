@@ -1,25 +1,28 @@
 # Textgraphy MVP
 
-A small interaction prototype for **Semantic Depth of Field**.
+A camera-shaped interaction prototype for exploring **Semantic Depth of Field**,
+style propagation, and argument panoramas in a long-form manuscript.
 
 ## Implemented
 
 - Camera-style black viewfinder UI with physical dials and shutter
 - Click a sentence to lock the optical and semantic focus together
-- Focus Mode dial lets the writer choose Claim, Scope, or Flow as the relation to follow
-- Hold Ctrl while moving the mouse to reframe the lens
-- Mouse wheel changes semantic aperture and lens size continuously
-- Shift + mouse wheel scrolls the manuscript
+- Follow controls let the writer choose Claim strength, Revision scope, or Argument flow
+- Frame supports Sentence, Paragraph, Section, and Document boundaries
+- Aperture continuously changes which related sentences enter the semantic plane
+- Hold Ctrl while moving the mouse to inspect elsewhere without changing the focal sentence
+- A visible Wheel control switches between aperture adjustment and normal manuscript scrolling
 - Related sentences enter focus directly in the manuscript
 - Color / Mono switch for comparing color cues without changing results
 - Five-step tone film: Clinical, Restrained, Balanced, Warm, and Expressive
-- Hovering a tone previews a real wording change in place; clicking commits it
-- Committed sentences retain their tone color in Color mode and the same wording in Mono mode
-- Clickable Paragraph / Section / Document frame dial
-- Shift + Click to manually include/exclude a sentence
-- Shutter freezes the semantic frame and compares neighboring tone treatments
-- The chosen treatment can propagate across the in-focus semantic frame
-- Selected takes can be applied back to the manuscript
+- Hovering a tone temporarily previews wording across the whole semantic plane
+- Clicking a tone keeps that preview visible; the shutter applies exactly what is shown
+- Adjust Selection exposes every included/excluded sentence without requiring a hidden gesture
+- Color / Mono keeps wording and scope identical, changing only the visual cue
+- Undo/Redo and per-sentence review support error recovery
+- Film stores actual captures, compares saved takes, and can restore a previous take
+- Pano sweeps from a chosen start to a scrolling/clicked endpoint and builds an evolving argument summary
+- Captures and applied wording are retained in browser storage
 
 ## Run
 
@@ -39,11 +42,20 @@ No npm install is required.
 
 ## Why mock AI?
 
-This MVP intentionally uses deterministic mock semantic scores so you can first judge whether the interaction itself feels novel and useful.
+This MVP intentionally uses a prepared manuscript, deterministic relatedness
+scores, authored tone variants, and authored Pano summaries. The interface marks
+the document as an example and does not imply that an AI service is connected.
 
 Later, replace:
 
-- `semanticScore()` with backend LLM relevance scores
-- `revisions` with real LLM revision outputs
+- `SemanticCamera.score()` with backend semantic relevance results
+- `toneVariants` with generated revision outputs
+- the authored Pano summary map with a grounded document summarizer
 
-The Aperture slider should stay entirely client-side so it remains continuous and low-latency.
+Keep Aperture filtering client-side so the interaction remains continuous and low-latency.
+
+## Verify
+
+```bash
+node --test tests/*.cjs
+```
