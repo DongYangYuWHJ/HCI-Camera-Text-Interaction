@@ -3,26 +3,28 @@
 A camera-shaped interaction prototype for exploring **Semantic Depth of Field**,
 style propagation, and argument panoramas in a long-form manuscript.
 
-## Implemented
+## Current interaction step
 
-- Camera-style black viewfinder UI with physical dials and shutter
-- Click a sentence to lock the optical and semantic focus together
-- Follow controls let the writer choose Claim strength, Revision scope, or Argument flow
-- Frame supports Sentence, Paragraph, Section, and Document boundaries
-- Aperture continuously changes which related sentences enter the semantic plane
-- Hold Ctrl while moving the mouse to inspect elsewhere without changing the focal sentence
-- A visible Wheel control switches between aperture adjustment and normal manuscript scrolling
-- Related sentences enter focus directly in the manuscript
-- Color / Mono switch for comparing color cues without changing results
-- Five-step tone film: Clinical, Restrained, Balanced, Warm, and Expressive
-- Hovering a tone temporarily previews wording across the whole semantic plane
-- Clicking a tone keeps that preview visible; the shutter applies exactly what is shown
-- Adjust Selection exposes every included/excluded sentence without requiring a hidden gesture
-- Color / Mono keeps wording and scope identical, changing only the visual cue
-- Undo/Redo and per-sentence review support error recovery
-- Film stores actual captures, compares saved takes, and can restore a previous take
-- Pano sweeps from a chosen start to a scrolling/clicked endpoint and builds an evolving argument summary
-- Captures and applied wording are retained in browser storage
+- The prototype opens as a normal, readable **Document Space**, without a control-console-first workflow.
+- Clicking a sentence selects it without immediately changing modes or modifying text.
+- The temporary selection card closes when the writer clicks elsewhere in the document or interface; clicks inside the card, its revision bar, or an open comparison keep it available. The close button and Escape remain equivalent shortcuts.
+- An explicit **Focus** action gathers passages with the same semantic concern into a separate **Semantic Viewfinder**.
+- The focal passage is pinned first; every related card shows its section, paragraph, sentence ID, and why it was gathered.
+- The gather transition starts from each passage's document location so the spatial change explains the system's interpretation.
+- Frame is a four-detent physical dial: point or drag around its face to snap between **Sentence / Paragraph / Section / Document**, deciding where Related passages may come from and updating the visible card set. Arrow keys move one structural level at a time.
+- Aperture is a physical polar dial inside the current Frame: point or drag around its face and the indicator follows the cursor angle relative to the center. The left arc is **Tighter / Fewer**, the right arc is **Wider / More**, the center has a jitter-resistant dead zone, and arrow keys provide precise control.
+- On desktop, the compact header and the Frame / Aperture dials form a left-hand range column while the two-dimensional Style field occupies the right column. This shallow instrument deck leaves the majority of the workspace continuous for reading; narrow screens stack the controls automatically.
+- Style is presented as one continuous two-dimensional field: **Tone** runs from Qualified to Assertive on the horizontal axis, while **Warmth** runs from Detached to Approachable on the vertical axis. Dragging the point previews wording directly in every selected passage; a single external **Reset style** action returns the point to the neutral center without adding named presets inside the field.
+- Color cues can be switched on to reinforce both axes through four distinct corners—soft warm, strong warm, soft cool, and strong cool—or off for a monochrome treatment; this presentation setting never changes the selected wording.
+- Every Related passage remains visible for transparency. Frame and Aperture make an initial suggestion, while an explicit **Apply change / Leave unchanged** checkbox on every card—including the focal reference—is the writer's final, persistent choice.
+- Clicking a passage's wording turns that sentence into a lightweight inline editor. A manual edit is locked against later Style movement, while **Use style suggestion** deliberately hands the sentence back to Style and **Restore original** returns the source wording in the preview. Apply commits the exact visible text, including direct edits, and keeps it in undo, comparison, and restored sessions.
+- **View in document** returns to and highlights a card's source; **Back to document** restores the previous reading position.
+- A floating confirmation capsule appears only when the preview contains real wording changes. **Cancel** restores the current document without leaving the viewfinder; **Apply** commits exactly the visible wording and immediately becomes **Undo**. Recently applied words stay highlighted in the viewfinder and receive a persistent marker back in the document. Selecting an edited sentence shows two actions at once: the normal **Focus** bar and a compact revision bar with **Compare / Keep current / Restore**. Keep current only closes comparison; it never removes access to the saved revision, and a one-sentence restore remains undoable.
+- Keyboard focus, Escape behavior, reduced-motion preferences, and screen-reader isolation are supported.
+
+The existing deterministic camera engine (history, Film, and Pano) remains in
+the codebase. Its remaining controls will be reintroduced one interaction at a
+time only when they support the document-first workflow.
 
 ## Run
 

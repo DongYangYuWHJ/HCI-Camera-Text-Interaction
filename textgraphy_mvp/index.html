@@ -40,6 +40,7 @@
           <button id="apertureDial" class="dial-control" type="button" aria-label="Change semantic aperture">
             <span class="dial aperture-dial" aria-hidden="true"><span class="dial-mark"></span></span>
             <span id="depthValue" class="control-value">f/5.6 · Medium</span>
+            <span class="dial-hint">DRAG · WHEEL</span>
           </button>
         </div>
 
@@ -64,6 +65,7 @@
           <button id="focusModeBtn" type="button" class="active" aria-pressed="true">FOCUS + STYLE</button>
           <button id="panoModeBtn" type="button" aria-pressed="false">PANO</button>
         </div>
+        <span id="spaceLabel" class="space-label"><i></i> DOCUMENT SPACE</span>
         <span class="demo-label" title="This prototype uses a prepared manuscript, relatedness scores and wording examples. No AI service is connected.">EXAMPLE MANUSCRIPT</span>
         <div class="session-actions">
           <button id="undoBtn" type="button" class="text-button" disabled>Undo</button>
@@ -126,24 +128,176 @@
           <div id="frameMembers" class="frame-members"></div>
         </div>
 
-        <section id="panoPanel" class="pano-panel hidden"></section>
+        <div id="spaceStage" class="space-stage">
+          <section id="panoPanel" class="pano-panel hidden"></section>
 
-        <div class="editor-wrap">
-        <div id="editor" class="editor" tabindex="0" aria-label="Semantic camera viewfinder">
-          <div id="baseLayer" class="text-layer base-layer"></div>
-          <div id="lensLayer" class="text-layer lens-layer" aria-hidden="true"></div>
-
-          <div id="lensRing" class="lens-ring" aria-hidden="true">
-            <span class="corner top-left"></span>
-            <span class="corner top-right"></span>
-            <span class="corner bottom-left"></span>
-            <span class="corner bottom-right"></span>
-            <span class="crosshair horizontal"></span>
-            <span class="crosshair vertical"></span>
-            <span id="lensDepth" class="lens-readout">f/5.6</span>
+          <div class="editor-wrap">
+            <div id="editor" class="editor" tabindex="0" aria-label="Document space">
+              <div id="baseLayer" class="text-layer base-layer"></div>
+            </div>
+            <aside class="document-overview" aria-labelledby="overviewTitle">
+              <header class="overview-head">
+                <span id="overviewTitle" class="micro-label">DOCUMENT MAP</span>
+                <b id="mapStatus">VIEW 0–0%</b>
+              </header>
+              <nav id="focusMap" class="focus-map" aria-label="Document thumbnail and navigation">
+                <div id="mapViewport" class="map-viewport" role="scrollbar" tabindex="0"
+                  aria-label="Visible manuscript range. Drag or use arrow keys to navigate."
+                  aria-orientation="vertical" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                  <span>VISIBLE</span>
+                </div>
+              </nav>
+              <div class="map-legend" aria-hidden="true">
+                <span class="legend-related"><i></i>Related</span>
+                <span class="legend-included"><i></i>In plane</span>
+                <span class="legend-focus"><i></i>Focus</span>
+              </div>
+            </aside>
           </div>
-        </div>
-        <nav id="focusMap" class="focus-map" aria-label="Sentence map"></nav>
+
+          <div class="document-action-stack" aria-live="polite">
+            <aside id="revisionPrompt" class="revision-prompt hidden" aria-label="Selected sentence revision actions">
+              <div class="revision-prompt-state">
+                <span class="revision-badge">EDITED</span>
+                <span id="revisionPromptNote">This sentence has a saved revision.</span>
+              </div>
+              <div class="revision-prompt-actions">
+                <button id="compareRevision" type="button">Compare</button>
+                <button id="keepRevision" type="button">Keep current</button>
+                <button id="restoreRevision" type="button">Restore</button>
+              </div>
+            </aside>
+
+            <aside id="focusPrompt" class="focus-prompt hidden" aria-labelledby="focusPromptTitle">
+              <button id="dismissFocusPrompt" class="focus-prompt-close" type="button" aria-label="Clear selection">×</button>
+              <span class="micro-label">SELECTED IN DOCUMENT</span>
+              <blockquote id="focusPromptText"></blockquote>
+              <div class="focus-prompt-action">
+                <div>
+                  <span class="micro-label">FOCAL CONCERN</span>
+                  <strong id="focusPromptTitle">—</strong>
+                </div>
+                <button id="enterViewfinder" class="enter-viewfinder" type="button">
+                  <span>FOCUS</span>
+                  <small>Gather related passages</small>
+                </button>
+              </div>
+            </aside>
+          </div>
+
+          <section id="semanticWorkspace" class="semantic-workspace" aria-labelledby="semanticTitle" aria-hidden="true">
+            <header class="semantic-head">
+              <div>
+                <span class="semantic-kicker"><i></i> SEMANTIC VIEWFINDER</span>
+                <h2 id="semanticTitle">Related passages</h2>
+                <p id="semanticSubtitle">Nothing in the document has been changed.</p>
+              </div>
+              <button id="exitViewfinder" class="back-document" type="button">← Back to document</button>
+            </header>
+            <div class="semantic-optics-bar">
+              <section class="semantic-frame-filter" aria-labelledby="semanticFrameTitle">
+                <div class="frame-filter-copy">
+                  <span class="micro-label">FRAME</span>
+                  <strong id="semanticFrameTitle">Document range</strong>
+                  <small>Where Related passages can come from.</small>
+                </div>
+                <div class="frame-filter-controls">
+                  <div class="frame-dial-control">
+                    <span class="frame-direction narrower"><b>NARROWER</b><small>Local</small></span>
+                    <button id="semanticFrameDial" class="semantic-frame-dial" type="button" role="slider"
+                      aria-labelledby="semanticFrameTitle" aria-describedby="semanticFrameStatus semanticFrameHint"
+                      aria-valuemin="0" aria-valuemax="3" aria-valuenow="3" aria-valuetext="Document frame">
+                      <span class="frame-dial-face" aria-hidden="true">
+                        <i class="frame-dial-pointer"></i>
+                        <i class="frame-dial-center"></i>
+                      </span>
+                      <span id="semanticFrameMode" class="frame-mode">DOCUMENT</span>
+                    </button>
+                    <span class="frame-direction broader"><b>WIDER</b><small>Global</small></span>
+                  </div>
+                  <div class="frame-readout">
+                    <output id="semanticFrameStatus" aria-live="polite">0 / 0 related passages in frame</output>
+                    <small id="semanticFrameHint">SENT · PARA · SECT · DOC</small>
+                  </div>
+                </div>
+              </section>
+              <section class="semantic-aperture" aria-labelledby="semanticApertureTitle">
+                <div class="aperture-copy">
+                  <span class="micro-label">APERTURE</span>
+                  <strong id="semanticApertureTitle">Semantic focus range</strong>
+                  <small>How many Related passages stay clear.</small>
+                </div>
+                <div class="aperture-control-inline">
+                  <div class="aperture-dial-control">
+                    <span class="aperture-direction tighter"><b>TIGHTER</b><small>Fewer</small></span>
+                    <button id="semanticAperture" class="semantic-aperture-dial" type="button" role="slider"
+                      aria-labelledby="semanticApertureTitle" aria-describedby="semanticApertureStatus semanticApertureHint"
+                      aria-valuemin="0" aria-valuemax="100" aria-valuenow="48">
+                      <span class="aperture-dial-face" aria-hidden="true">
+                        <i class="aperture-dial-pointer"></i>
+                        <i class="aperture-dial-center"></i>
+                      </span>
+                      <span id="semanticApertureMode" class="aperture-mode">BALANCED</span>
+                    </button>
+                    <span class="aperture-direction wider"><b>WIDER</b><small>More</small></span>
+                  </div>
+                  <div class="aperture-readout">
+                    <output id="semanticApertureStatus" aria-live="polite">Balanced · 0 / 0 passages in focus</output>
+                    <small id="semanticApertureHint">POINT / DRAG AROUND DIAL · ARROW KEYS</small>
+                  </div>
+                </div>
+              </section>
+            </div>
+            <section class="semantic-style-panel" aria-labelledby="semanticStyleTitle">
+              <div class="style-copy">
+                <span class="micro-label">STYLE</span>
+                <strong id="semanticStyleTitle">Writing treatment</strong>
+                <small>Preview the voice directly in the passages.</small>
+              </div>
+              <div class="style-coordinate">
+                <div class="style-y-label top" aria-hidden="true"><b>APPROACHABLE</b><small>Personal · inviting</small></div>
+                <div class="style-plane-row">
+                  <span class="style-x-label left" aria-hidden="true"><b>QUALIFIED</b><small>Cautious</small></span>
+                  <div id="semanticStylePlane" class="semantic-style-plane" role="group"
+                    aria-labelledby="semanticStyleTitle" aria-describedby="semanticStyleStatus semanticStyleHint">
+                    <i class="style-axis horizontal" aria-hidden="true"></i>
+                    <i class="style-axis vertical" aria-hidden="true"></i>
+                    <button id="semanticStyleCursor" class="semantic-style-cursor" type="button"
+                      aria-label="Style position. Use arrow keys to adjust Tone and Warmth.">
+                      <span aria-hidden="true"></span>
+                    </button>
+                  </div>
+                  <span class="style-x-label right" aria-hidden="true"><b>ASSERTIVE</b><small>Sharp</small></span>
+                </div>
+                <div class="style-y-label bottom" aria-hidden="true"><b>DETACHED</b><small>Formal · impersonal</small></div>
+                <div class="style-status-line">
+                  <output id="semanticStyleStatus">Balanced tone · Neutral warmth</output>
+                  <small id="semanticStyleHint">DRAG THE POINT · ARROW KEYS · PREVIEW ONLY</small>
+                </div>
+              </div>
+              <div class="style-actions">
+                <button id="semanticColorToggle" class="semantic-color-toggle" type="button" aria-pressed="true">
+                  <span class="style-color-swatch" aria-hidden="true"></span>
+                  <span><b id="semanticColorState">Color cues on</b><small>Show both axes</small></span>
+                </button>
+                <button id="semanticStyleReset" class="semantic-style-reset" type="button">Reset style</button>
+              </div>
+            </section>
+            <div id="semanticCards" class="semantic-cards" aria-live="polite"></div>
+            <div id="semanticCommitBar" class="semantic-action-capsule hidden" role="region" aria-label="Preview actions">
+              <span><i aria-hidden="true"></i><b id="semanticCommitNote">Document not changed yet</b></span>
+              <button id="semanticCancelPreview" class="semantic-action-secondary" type="button">Cancel</button>
+              <button id="semanticApplyPreview" class="semantic-apply-preview" type="button">Apply changes</button>
+            </div>
+            <div id="semanticUndoBar" class="semantic-action-capsule semantic-undo-capsule hidden" role="status">
+              <span><i aria-hidden="true"></i><b id="semanticUndoNote">Changes applied</b></span>
+              <button id="semanticUndoApply" class="semantic-action-secondary" type="button">Undo</button>
+            </div>
+            <footer class="semantic-footer">
+              <span id="semanticStatus"><i></i> Gathering passages from the manuscript…</span>
+              <strong id="semanticSafetyState">REVIEW ONLY · NO TEXT MODIFIED</strong>
+            </footer>
+          </section>
         </div>
 
         <div class="exposure-bar">
@@ -154,11 +308,11 @@
         </div>
 
         <div class="viewfinder-hud hud-bottom">
-          <span><kbd>CTRL</kbd> + MOVE &nbsp; INSPECT</span>
-          <button id="wheelMode" class="text-button" type="button" aria-pressed="true">WHEEL: APERTURE</button>
+          <span>WHEEL &nbsp; SCROLL DOCUMENT</span>
+          <span>DRAG MAP FRAME &nbsp; NAVIGATE</span>
+          <span>DRAG / WHEEL APERTURE DIAL &nbsp; CHANGE DEPTH</span>
           <span>CLICK &nbsp; SET FOCUS</span>
           <span><kbd>SHIFT</kbd> + CLICK &nbsp; KEEP / DROP</span>
-          <span><kbd>SHIFT</kbd> + WHEEL &nbsp; SCROLL</span>
         </div>
       </section>
     </main>

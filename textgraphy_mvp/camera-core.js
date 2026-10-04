@@ -40,13 +40,17 @@
       this.manualInclude = new Set();
       this.manualExclude = new Set();
       this.committed = new Map();
+      this.committedText = new Map();
+      this.manualDrafts = new Map();
       this.captures = [];
       this.undoStack = [];
       this.redoStack = [];
     }
 
     get toneBySentence() { return this.committed; }
-    get threshold() { return 0.95 - this.aperture * 0.006; }
+    // The tightest aperture isolates the focal passage; the widest still
+    // includes the weakest prepared semantic match in this prototype.
+    get threshold() { return 1.001 - this.aperture * 0.006; }
 
     focus(id, { preserveIntent = false } = {}) {
       const sentence = this._sentences.get(id);
@@ -93,7 +97,17 @@
     discardPreview() {
       this.draftTone = null;
       this.hoverTone = null;
+      this.manualDrafts.clear();
     }
+
+    setManualDraft(id, text) {
+      if (!this._sentences.has(id) || typeof text !== "string") return false;
+      this.manualDrafts.set(id, text);
+      return true;
+    }
+
+    clearManualDraft(id) { return this.manualDrafts.delete(id); }
+    hasManualDraft(id) { return this.manualDrafts.has(id); }
 
     inFrame(id) {
       const sentence = this._sentences.get(id);
@@ -119,9 +133,9 @@
 
     inFocus(id) {
       if (!this.inFrame(id)) return false;
-      if (id === this.focusId) return true;
       if (this.manualExclude.has(id)) return false;
       if (this.manualInclude.has(id)) return true;
+      if (id === this.focusId) return true;
       return this.score(id) >= this.threshold;
     }
 
@@ -131,7 +145,8 @@
       if (!this._sentences.has(id)) return "Unknown sentence";
       if (!this.focusId) return "Choose a focal sentence first";
       if (!this.inFrame(id)) return "Outside the current frame";
-      if (id === this.focusId) return "Focal sentence · always included";
+      if (id === this.focusId && this.manualExclude.has(id)) return "Focal reference · left unchanged";
+      if (id === this.focusId) return "Focal reference · selected for change";
       if (this.manualExclude.has(id)) return "Manually excluded";
       if (this.manualInclude.has(id)) return "Manually included";
       if (this._sentences.get(id).issue !== this.focusIssue) return "Different issue category · outside semantic depth";
@@ -139,7 +154,7 @@
     }
 
     toggleMembership(id) {
-      if (!this.inFrame(id) || id === this.focusId) return false;
+      if (!this.inFrame(id)) return false;
       const wasIncluded = this.inFocus(id);
       this.manualInclude.delete(id);
       this.manualExclude.delete(id);
@@ -166,9 +181,11 @@
     }
 
     text(id, { committed = false } = {}) {
+      if (!committed && this.inFocus(id) && this.manualDrafts.has(id)) return this.manualDrafts.get(id);
       if (!committed && this.inFocus(id) && (this.hoverTone || this.draftTone)) {
         return this._textForTone(id, this.hoverTone || this.draftTone);
       }
+      if (this.committedText.has(id)) return this.committedText.get(id);
       return this._textForTone(id, this.committed.get(id) ?? null);
     }
 
@@ -176,11 +193,20 @@
       return this.includedIds().filter(id => this.text(id) !== this.text(id, { committed: true }));
     }
 
-    _snapshot() { return [...this.committed]; }
+    _snapshot() {
+      const ids = new Set([...this.committed.keys(), ...this.committedText.keys()]);
+      return [...ids].map(id => this.committedText.has(id)
+        ? [id, this.committed.get(id) ?? null, this.committedText.get(id)]
+        : [id, this.committed.get(id)]);
+    }
 
     _loadSnapshot(snapshot) {
       this.committed.clear();
-      snapshot.forEach(([id, tone]) => this.committed.set(id, tone));
+      this.committedText.clear();
+      snapshot.forEach(([id, tone, text]) => {
+        if (tone !== null && tone !== undefined) this.committed.set(id, tone);
+        if (typeof text === "string") this.committedText.set(id, text);
+      });
     }
 
     _record(kind, before, detail) {
@@ -194,7 +220,7 @@
       const tone = this.hoverTone || this.draftTone;
       const includedIds = this.includedIds();
       const pendingIds = this.pendingIds();
-      if (!tone || pendingIds.length === 0) {
+      if (pendingIds.length === 0) {
         this.discardPreview();
         return null;
       }
@@ -209,16 +235,21 @@
         tone,
         includedIds,
         excludedIds: this.sentences.filter(sentence => this.inFrame(sentence.id) && !this.inFocus(sentence.id)).map(sentence => sentence.id),
-        changes: pendingIds.map(id => ({
-          id,
-          before: this.text(id, { committed: true }),
-          after: this.text(id),
-          beforeTone: this.committed.get(id) ?? null,
-          afterTone: tone
-        })),
+        changes: pendingIds.map(id => {
+          const manualText = this.manualDrafts.get(id) ?? null;
+          return {
+            id,
+            before: this.text(id, { committed: true }),
+            after: this.text(id),
+            beforeTone: this.committed.get(id) ?? null,
+            afterTone: manualText === null ? tone : tone || this.committed.get(id) || null,
+            beforeCustomText: this.committedText.get(id) ?? null,
+            afterCustomText: manualText
+          };
+        }),
         createdAt: new Date().toISOString()
       });
-      capture.changes.forEach(change => this.committed.set(change.id, change.afterTone));
+      capture.changes.forEach(change => this._applyChangeState(change.id, change.afterTone, change.afterCustomText));
       this.captures.push(capture);
       this._record("capture", before, { captureId: capture.id });
       this.discardPreview();
@@ -250,8 +281,15 @@
       const changes = capture.changes.filter(change => this.text(change.id, { committed: true }) !== change.after);
       if (!changes.length) return null;
       const before = this._snapshot();
-      changes.forEach(change => this.committed.set(change.id, change.afterTone));
+      changes.forEach(change => this._applyChangeState(change.id, change.afterTone, change.afterCustomText ?? null));
       return this._record("restore", before, { captureId });
+    }
+
+    _applyChangeState(id, tone, customText) {
+      if (tone === null || tone === undefined) this.committed.delete(id);
+      else this.committed.set(id, tone);
+      if (typeof customText === "string") this.committedText.set(id, customText);
+      else this.committedText.delete(id);
     }
 
     revertChange(captureId, sentenceId) {
@@ -259,8 +297,7 @@
       const change = capture?.changes.find(item => item.id === sentenceId);
       if (!change || this.text(sentenceId, { committed: true }) !== change.after) return false;
       const before = this._snapshot();
-      if (change.beforeTone === null) this.committed.delete(sentenceId);
-      else this.committed.set(sentenceId, change.beforeTone);
+      this._applyChangeState(sentenceId, change.beforeTone, change.beforeCustomText ?? null);
       this.discardPreview();
       this._record("revert", before, { captureId, sentenceId });
       return true;
@@ -299,7 +336,9 @@
         const ids = list => Array.isArray(list) && new Set(list).size === list.length && list.every(id => this._sentences.has(id));
         const validTone = tone => tone === null || this._tones.has(tone);
         const snapshot = list => Array.isArray(list) && list.every(entry => Array.isArray(entry) &&
-          entry.length === 2 && this._sentences.has(entry[0]) && entry[1] !== null && validTone(entry[1])) &&
+          (entry.length === 2 || entry.length === 3) && this._sentences.has(entry[0]) &&
+          (entry.length === 2 ? entry[1] !== null && validTone(entry[1]) :
+            validTone(entry[1]) && typeof entry[2] === "string")) &&
           new Set(list.map(entry => entry[0])).size === list.length;
         const validFrame = item => FRAMES.has(item.frame) && typeof item.aperture === "number" &&
           Number.isFinite(item.aperture) && item.aperture >= 0 && item.aperture <= 100;
@@ -310,24 +349,30 @@
             !validFrame(data) || typeof data.color !== "boolean" ||
             !ids(data.manualInclude) || !ids(data.manualExclude) ||
             data.manualInclude.some(id => data.manualExclude.includes(id)) ||
-            data.manualExclude.includes(data.focusId) || !snapshot(data.committed) ||
+            !snapshot(data.committed) ||
             !Array.isArray(data.captures) || !Array.isArray(data.undoStack) || !Array.isArray(data.redoStack)) return false;
 
         const captureIds = new Set();
         for (const capture of data.captures) {
           if (!plain(capture) || capture.id !== String(captureIds.size + 1).padStart(2, "0") ||
               capture.kind !== "style" || !this._sentences.has(capture.focusId) || !this._issues.has(capture.focusIssue) ||
-              !validFrame(capture) || !this._tones.has(capture.tone) ||
-              !ids(capture.includedIds) || !capture.includedIds.includes(capture.focusId) ||
+              !validFrame(capture) || !validTone(capture.tone) ||
+              !ids(capture.includedIds) ||
               !ids(capture.excludedIds) || capture.excludedIds.some(id => capture.includedIds.includes(id)) ||
               !Array.isArray(capture.changes) || capture.changes.length === 0 ||
               !ids(capture.changes.map(change => change?.id)) ||
               typeof capture.createdAt !== "string" || !Number.isFinite(Date.parse(capture.createdAt))) return false;
           for (const change of capture.changes) {
+            const beforeCustom = change.beforeCustomText ?? null;
+            const afterCustom = change.afterCustomText ?? null;
             if (!plain(change) || !capture.includedIds.includes(change.id) || !validTone(change.beforeTone) ||
-                change.afterTone !== capture.tone || change.before === change.after ||
-                change.before !== this._textForTone(change.id, change.beforeTone) ||
-                change.after !== this._textForTone(change.id, change.afterTone)) return false;
+                !validTone(change.afterTone) ||
+                !(beforeCustom === null || typeof beforeCustom === "string") ||
+                !(afterCustom === null || typeof afterCustom === "string") ||
+                change.before === change.after ||
+                change.before !== (beforeCustom ?? this._textForTone(change.id, change.beforeTone)) ||
+                change.after !== (afterCustom ?? this._textForTone(change.id, change.afterTone)) ||
+                (afterCustom === null && change.afterTone !== capture.tone)) return false;
           }
           captureIds.add(capture.id);
         }
@@ -337,7 +382,8 @@
               (operation.kind === "revert" && !data.captures.find(item => item.id === operation.captureId).changes.some(item => item.id === operation.sentenceId))) return false;
         }
         // A damaged history must never replace unrelated text during a later undo.
-        const equalSnapshots = (left, right) => JSON.stringify([...left].sort()) === JSON.stringify([...right].sort());
+        const equalSnapshots = (left, right) => JSON.stringify([...left].sort((a, b) => a[0].localeCompare(b[0]))) ===
+          JSON.stringify([...right].sort((a, b) => a[0].localeCompare(b[0])));
         let cursor = data.committed;
         for (let index = data.undoStack.length - 1; index >= 0; index--) {
           const operation = data.undoStack[index];

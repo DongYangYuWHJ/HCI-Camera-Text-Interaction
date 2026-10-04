@@ -47,6 +47,8 @@ test("frame is a hard boundary, aperture expands every preview, and overrides ar
   state.focus("s1");
   state.setTone("warm");
   assert.deepEqual(state.includedIds(), ["s1", "s3"]);
+  state.setAperture(0);
+  assert.deepEqual(state.includedIds(), ["s1"], "the tightest aperture isolates the focal sentence");
   state.setAperture(100);
   assert.deepEqual(state.includedIds(), ["s1", "s3", "s4", "s5"]);
   assert.equal(state.text("s5"), "Warm s5.");
@@ -61,11 +63,12 @@ test("frame is a hard boundary, aperture expands every preview, and overrides ar
   assert.deepEqual(state.includedIds(), ["s1", "s2"]);
   assert.equal(state.inFrame("s4"), false, "paragraph ids in other sections cannot leak into the frame");
   assert.equal(state.toggleMembership("s4"), false);
-  assert.equal(state.toggleMembership("s1"), false);
+  assert.equal(state.toggleMembership("s1"), true);
+  assert.equal(state.inFocus("s1"), false, "the focal sentence can remain a reference without being changed");
   state.setFrame("sentence");
-  assert.deepEqual(state.includedIds(), ["s1"]);
+  assert.deepEqual(state.includedIds(), []);
   state.setFrame("section");
-  assert.deepEqual(state.includedIds(), ["s1", "s2"]);
+  assert.deepEqual(state.includedIds(), ["s2"]);
   state.resetMembership();
   assert.deepEqual(state.includedIds(), ["s1", "s3"]);
   assert.match(state.reason("s1"), /Focal/);
@@ -117,6 +120,66 @@ test("capture saves exactly the text on screen, immutable history, and no redund
   assert.equal(state.capture(), null);
   assert.equal(state.captures.length, 1);
   assert.equal(state.undoStack.length, 1);
+});
+
+test("the focal passage can stay as a reference without receiving the style change", () => {
+  const state = camera();
+  state.focus("s1");
+  state.setAperture(100);
+  assert.equal(state.toggleMembership("s1"), true);
+  state.setTone("warm");
+  assert.equal(state.text("s1"), "Original one.");
+  assert.equal(state.text("s3"), "Warm s3.");
+  const capture = state.capture();
+  assert.ok(capture);
+  assert.equal(capture.includedIds.includes("s1"), false);
+  assert.equal(capture.excludedIds.includes("s1"), true);
+  assert.equal(capture.changes.some(change => change.id === "s1"), false);
+
+  const restored = camera();
+  assert.equal(restored.restoreSession(state.exportSession()), true);
+  assert.equal(restored.focusId, "s1");
+  assert.equal(restored.inFocus("s1"), false);
+  assert.match(restored.reason("s1"), /reference/);
+});
+
+test("manual wording is locked against style movement, committed exactly, and survives history", () => {
+  const state = camera();
+  state.focus("s1");
+  state.setAperture(100);
+  state.setTone("warm");
+  state.setManualDraft("s1", "My exact sentence.");
+  state.setTone("clinical");
+  assert.equal(state.text("s1"), "My exact sentence.");
+  assert.equal(state.text("s3"), "Clinical s3.");
+  assert.deepEqual(state.pendingIds(), ["s1", "s3", "s4", "s5"]);
+
+  const capture = state.capture();
+  assert.equal(capture.changes.find(change => change.id === "s1").afterCustomText, "My exact sentence.");
+  assert.equal(state.text("s1", { committed: true }), "My exact sentence.");
+  assert.equal(state.manualDrafts.size, 0);
+  state.undo();
+  assert.equal(state.text("s1"), "Original one.");
+  state.redo();
+  assert.equal(state.text("s1"), "My exact sentence.");
+
+  const restored = camera();
+  assert.equal(restored.restoreSession(state.exportSession()), true);
+  assert.equal(restored.text("s1"), "My exact sentence.");
+  assert.equal(restored.revertChange(capture.id, "s1"), true);
+  assert.equal(restored.text("s1"), "Original one.");
+});
+
+test("a manual edit can be applied without first moving Style", () => {
+  const state = camera();
+  state.focus("s1");
+  state.setFrame("sentence");
+  state.setManualDraft("s1", "Directly edited.");
+  const capture = state.capture();
+  assert.ok(capture);
+  assert.equal(capture.tone, null);
+  assert.equal(capture.changes[0].afterTone, null);
+  assert.equal(state.text("s1"), "Directly edited.");
 });
 
 test("capture changes only actual text differences including return to original treatment", () => {
@@ -269,7 +332,7 @@ test("malformed persistence is rejected atomically, including incompatible docum
     session => { session.version = 2; },
     session => { session.committed = [["s1", "unknown"]]; },
     session => { session.focusId = "missing"; },
-    session => { session.manualExclude = ["s1"]; },
+    session => { session.manualInclude = ["s3"]; session.manualExclude = ["s3"]; },
     session => { session.aperture = -1; },
     session => { session.document[0].text = "Different document"; },
     session => { session.captures[0].changes[0].after = "Corrupt text"; },
