@@ -19,12 +19,14 @@ style propagation, and argument panoramas in a long-form manuscript.
 - Every Related passage remains visible for transparency. Frame and Aperture make an initial suggestion, while an explicit **Apply change / Leave unchanged** checkbox on every card—including the focal reference—is the writer's final, persistent choice.
 - Clicking a passage's wording turns that sentence into a lightweight inline editor. A manual edit is locked against later Style movement, while **Use style suggestion** deliberately hands the sentence back to Style and **Restore original** returns the source wording in the preview. Apply commits the exact visible text, including direct edits, and keeps it in undo, comparison, and restored sessions.
 - **View in document** returns to and highlights a card's source; **Back to document** restores the previous reading position.
-- A floating confirmation capsule appears only when the preview contains real wording changes. **Cancel** restores the current document without leaving the viewfinder; **Apply** commits exactly the visible wording and immediately becomes **Undo**. Recently applied words stay highlighted in the viewfinder and receive a persistent marker back in the document. Selecting an edited sentence shows two actions at once: the normal **Focus** bar and a compact revision bar with **Compare / Keep current / Restore**. Keep current only closes comparison; it never removes access to the saved revision, and a one-sentence restore remains undoable.
+- A floating Shutter capsule appears only when the preview contains real wording changes. **Cancel** restores the current document without leaving the viewfinder; pressing **Shutter** commits exactly the visible wording as a numbered Take, gives a restrained capture flash, and immediately becomes a Take receipt with **Undo**. Recently applied words stay highlighted in the viewfinder and receive a persistent marker back in the document. Selecting an edited sentence shows two actions at once: the normal **Focus** bar and a compact revision bar with **Compare / Keep current / Restore**. Keep current only closes comparison; it never removes access to the saved revision, and a one-sentence restore remains undoable.
+- The persistent **Takes** counter opens Film as a safe revision history. A whole Take or one sentence can be reverted and reapplied; anything modified by a later Take is labeled **Changed later**, locked, and skipped rather than silently overwritten. Each Take summarizes current, reverted, and protected passages and keeps direct edits visible.
+- **Pano** opens a document-first panoramic reading space. It begins at the currently selected sentence—or the start of the manuscript—and a second click sets the endpoint; the continuous range, argument steps, and clearly labeled example synthesis update together. A new start can be chosen directly, reverse sweeps normalize to reading order, and Shutter saves a reviewable Pano snapshot without modifying the document.
 - Keyboard focus, Escape behavior, reduced-motion preferences, and screen-reader isolation are supported.
 
-The existing deterministic camera engine (history, Film, and Pano) remains in
-the codebase. Its remaining controls will be reintroduced one interaction at a
-time only when they support the document-first workflow.
+The prototype now covers the complete document-first loop: select text, gather
+semantic context, control revision scope and style, capture a safe Take, review
+history, and trace a continuous argument with Pano.
 
 ## Run
 

@@ -303,6 +303,55 @@
       return true;
     }
 
+    reapplyChange(captureId, sentenceId) {
+      const capture = this.captures.find(item => item.id === captureId);
+      const change = capture?.changes.find(item => item.id === sentenceId);
+      if (!change || this.changeStatus(captureId, sentenceId) !== "reverted") return false;
+      const before = this._snapshot();
+      this._applyChangeState(sentenceId, change.afterTone, change.afterCustomText ?? null);
+      this.discardPreview();
+      this._record("reapply-change", before, { captureId, sentenceId });
+      return true;
+    }
+
+    revertCapture(captureId) {
+      const capture = this.captures.find(item => item.id === captureId);
+      if (!capture) return null;
+      const revertedIds = capture.changes
+        .filter(change => this.changeStatus(captureId, change.id) === "applied")
+        .map(change => change.id);
+      const blockedIds = capture.changes
+        .filter(change => this.changeStatus(captureId, change.id) === "superseded")
+        .map(change => change.id);
+      if (!revertedIds.length) return null;
+      const before = this._snapshot();
+      revertedIds.forEach(id => {
+        const change = capture.changes.find(item => item.id === id);
+        this._applyChangeState(id, change.beforeTone, change.beforeCustomText ?? null);
+      });
+      this.discardPreview();
+      return this._record("revert-capture", before, { captureId, sentenceIds: revertedIds, blockedIds });
+    }
+
+    reapplyCapture(captureId) {
+      const capture = this.captures.find(item => item.id === captureId);
+      if (!capture) return null;
+      const reappliedIds = capture.changes
+        .filter(change => this.changeStatus(captureId, change.id) === "reverted")
+        .map(change => change.id);
+      const blockedIds = capture.changes
+        .filter(change => this.changeStatus(captureId, change.id) === "superseded")
+        .map(change => change.id);
+      if (!reappliedIds.length) return null;
+      const before = this._snapshot();
+      reappliedIds.forEach(id => {
+        const change = capture.changes.find(item => item.id === id);
+        this._applyChangeState(id, change.afterTone, change.afterCustomText ?? null);
+      });
+      this.discardPreview();
+      return this._record("reapply-capture", before, { captureId, sentenceIds: reappliedIds, blockedIds });
+    }
+
     changeStatus(captureId, sentenceId) {
       const change = this.captures.find(item => item.id === captureId)?.changes.find(item => item.id === sentenceId);
       if (!change) return null;
@@ -377,9 +426,13 @@
           captureIds.add(capture.id);
         }
         for (const operation of [...data.undoStack, ...data.redoStack]) {
-          if (!plain(operation) || !["capture", "restore", "revert"].includes(operation.kind) ||
+          if (!plain(operation) || !["capture", "restore", "revert", "reapply-change", "revert-capture", "reapply-capture"].includes(operation.kind) ||
               !captureIds.has(operation.captureId) || !snapshot(operation.before) || !snapshot(operation.after) ||
-              (operation.kind === "revert" && !data.captures.find(item => item.id === operation.captureId).changes.some(item => item.id === operation.sentenceId))) return false;
+              (["revert", "reapply-change"].includes(operation.kind) &&
+                !data.captures.find(item => item.id === operation.captureId).changes.some(item => item.id === operation.sentenceId)) ||
+              (["revert-capture", "reapply-capture"].includes(operation.kind) &&
+                (!ids(operation.sentenceIds) || !Array.isArray(operation.blockedIds) ||
+                  operation.blockedIds.some(id => !this._sentences.has(id))))) return false;
         }
         // A damaged history must never replace unrelated text during a later undo.
         const equalSnapshots = (left, right) => JSON.stringify([...left].sort((a, b) => a[0].localeCompare(b[0]))) ===

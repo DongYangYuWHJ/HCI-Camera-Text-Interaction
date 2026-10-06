@@ -45,6 +45,9 @@ let refreshQueued = false;
 let storageAvailable = true;
 let selectedDocumentId = null;
 let semanticOpen = false;
+let panoOpen = false;
+let panoChoosingStart = false;
+let panoRecentCapture = null;
 let semanticSession = null;
 let semanticReadyTimer = null;
 let documentScrollTop = 0;
@@ -156,17 +159,21 @@ function refresh() {
   document.body.classList.toggle("tone-active", focused);
   document.body.classList.toggle("editing-frame", editingFrame);
   document.body.classList.toggle("pano-active", !isFocus);
-  document.body.classList.toggle("document-space", !semanticOpen);
+  document.body.classList.toggle("document-space", !semanticOpen && !panoOpen);
   document.body.classList.toggle("semantic-space", semanticOpen);
+  document.body.classList.toggle("pano-space", panoOpen);
   const selectedSentence = sentences.find(sentence => sentence.id === selectedDocumentId);
   document.body.dataset.issue = semanticOpen ? camera.focusIssue || "none" : selectedSentence?.issue || "none";
   // The Semantic Viewfinder keeps the issue color stable. Style intensity is
   // communicated locally by the spectrum rather than categorical hue jumps.
   document.body.dataset.tone = semanticOpen ? "none" : tone || "none";
-  $("spaceLabel").innerHTML = semanticOpen ? "<i></i> SEMANTIC VIEWFINDER" : "<i></i> DOCUMENT SPACE";
+  $("spaceLabel").innerHTML = semanticOpen ? "<i></i> SEMANTIC VIEWFINDER" : panoOpen ? "<i></i> PANORAMIC READING" : "<i></i> DOCUMENT SPACE";
   $("semanticWorkspace").setAttribute("aria-hidden", String(!semanticOpen));
-  editor.setAttribute("aria-hidden", String(semanticOpen));
-  editor.tabIndex = semanticOpen ? -1 : 0;
+  $("panoWorkspace").setAttribute("aria-hidden", String(!panoOpen));
+  $("panoEntryBtn").setAttribute("aria-expanded", String(panoOpen));
+  $("panoHistoryCount").textContent = String(panoCaptures.length).padStart(2, "0");
+  editor.setAttribute("aria-hidden", String(semanticOpen || panoOpen));
+  editor.tabIndex = semanticOpen || panoOpen ? -1 : 0;
 
   baseLayer.querySelectorAll(".sentence").forEach(el => {
     const id = el.dataset.id;
@@ -237,6 +244,8 @@ function refresh() {
   $("undoBtn").disabled = !camera.undoStack.length;
   $("redoBtn").disabled = !camera.redoStack.length;
   $("filmCount").textContent = String(camera.captures.length + panoCaptures.length).padStart(2, "0");
+  $("takeHistoryCount").textContent = String(camera.captures.length).padStart(2, "0");
+  $("takeHistoryBtn").disabled = camera.captures.length === 0;
   $("reviewBtn").classList.toggle("hidden", !camera.captures.length || !!tone || !isFocus);
   $("focusModeBtn").setAttribute("aria-pressed", String(isFocus));
   $("panoModeBtn").setAttribute("aria-pressed", String(!isFocus));
@@ -702,15 +711,16 @@ function updateSemanticCommitActions() {
     camera.undoStack.at(-1)?.kind === "capture" && camera.undoStack.at(-1)?.captureId === semanticRecentCapture.id;
   $("semanticCommitBar").classList.toggle("hidden", !hasPending);
   $("semanticUndoBar").classList.toggle("hidden", !canUndoRecent);
-  $("semanticCommitNote").textContent = `Document not changed yet · ${pendingIds.length} passage${pendingIds.length === 1 ? "" : "s"}`;
-  $("semanticApplyPreview").textContent = `Apply ${pendingIds.length} change${pendingIds.length === 1 ? "" : "s"}`;
+  $("semanticCommitNote").textContent = `PREVIEW READY · ${pendingIds.length} passage${pendingIds.length === 1 ? "" : "s"} · document unchanged`;
+  $("semanticShutterCount").textContent = `Capture ${pendingIds.length} change${pendingIds.length === 1 ? "" : "s"}`;
+  $("semanticApplyPreview").setAttribute("aria-label", `Shutter. Capture ${pendingIds.length} visible change${pendingIds.length === 1 ? "" : "s"} as a new take.`);
   if (semanticRecentCapture) {
     const count = semanticRecentCapture.changes.length;
-    $("semanticUndoNote").textContent = `${count} passage${count === 1 ? "" : "s"} updated`;
+    $("semanticUndoNote").textContent = `TAKE ${semanticRecentCapture.id} CAPTURED · ${count} passage${count === 1 ? "" : "s"}`;
   }
   $("semanticSafetyState").textContent = hasPending
-    ? "PREVIEW · DOCUMENT NOT CHANGED"
-    : canUndoRecent ? "APPLIED · UNDO AVAILABLE" : "REVIEW ONLY · NO TEXT MODIFIED";
+    ? "PREVIEW · SHUTTER NOT PRESSED"
+    : canUndoRecent ? `TAKE ${semanticRecentCapture.id} · UNDO AVAILABLE` : "REVIEW ONLY · NO TEXT MODIFIED";
 }
 
 function updateSemanticStyle(toneValue, warmthValue, { selectTone = true, announceChange = false } = {}) {
@@ -1072,20 +1082,33 @@ $("semanticCancelPreview").addEventListener("click", () => {
 });
 
 $("semanticApplyPreview").addEventListener("click", () => {
+  const shutter = $("semanticApplyPreview");
+  if (shutter.disabled) return;
+  shutter.disabled = true;
   const snapshot = camera.capture();
   if (!snapshot) {
+    shutter.disabled = false;
     updateSemanticCommitActions();
     return;
   }
+  $("semanticWorkspace").classList.remove("is-taking-shot");
+  void $("semanticWorkspace").offsetWidth;
+  $("semanticWorkspace").classList.add("is-taking-shot");
   semanticRecentCapture = snapshot;
   inlineRevisionId = null;
   editingSemanticId = null;
   selectedCapture = snapshot.id;
   renderSemanticCards();
   updateSemanticStyle(semanticToneValue, semanticWarmthValue, { selectTone: false });
+  $("semanticStatus").innerHTML = `<i></i> TAKE ${snapshot.id} captured · ${snapshot.changes.length} passage${snapshot.changes.length === 1 ? "" : "s"} committed`;
+  $("semanticSafetyState").textContent = `TAKE ${snapshot.id} · UNDO AVAILABLE`;
   refresh();
   saveSession();
-  announce(`${snapshot.changes.length} passage${snapshot.changes.length === 1 ? "" : "s"} updated. Undo is available.`);
+  window.setTimeout(() => {
+    $("semanticWorkspace").classList.remove("is-taking-shot");
+    shutter.disabled = false;
+  }, 560);
+  announce(`Take ${snapshot.id} captured. ${snapshot.changes.length} passage${snapshot.changes.length === 1 ? "" : "s"} committed exactly as shown. Undo is available.`);
 });
 
 $("semanticUndoApply").addEventListener("click", () => {
@@ -1413,6 +1436,7 @@ document.addEventListener("keydown", event => {
   }
   if (event.key === "Escape") {
     if (!$("filmDrawer").classList.contains("hidden")) closeFilm();
+    else if (panoOpen) exitPanoWorkspace();
     else if (inlineRevisionId) {
       const id = inlineRevisionId;
       inlineRevisionId = null;
@@ -1449,14 +1473,43 @@ $("shutter").addEventListener("click", () => {
 
 function allCaptures() { return [...camera.captures, ...panoCaptures].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)); }
 function captureById(id) { return allCaptures().find(c => c.id === id); }
-function captureName(c) { return c.kind === "pano" ? `Pano ${c.id}` : `Take ${c.id} · ${toneTreatments[c.tone]?.label || c.tone}`; }
+function captureName(c) { return c.kind === "pano" ? `Pano ${c.id}` : `Take ${c.id}`; }
+
+function takeState(capture) {
+  const statuses = capture.changes.map(change => camera.changeStatus(capture.id, change.id));
+  const applied = statuses.filter(status => status === "applied").length;
+  const reverted = statuses.filter(status => status === "reverted").length;
+  const superseded = statuses.filter(status => status === "superseded").length;
+  if (applied === statuses.length) return { label: "CURRENT", className: "current", applied, reverted, superseded };
+  if (reverted === statuses.length) return { label: "REVERTED", className: "reverted", applied, reverted, superseded };
+  if (superseded === statuses.length) return { label: "CHANGED LATER", className: "superseded", applied, reverted, superseded };
+  return { label: "PARTIAL", className: "partial", applied, reverted, superseded };
+}
+
+function refreshAfterTakeHistoryAction(message) {
+  clearSemanticAppliedState();
+  editingSemanticId = null;
+  if (semanticOpen) {
+    camera.discardPreview();
+    semanticToneValue = 50;
+    semanticWarmthValue = 50;
+    renderSemanticCards();
+    updateSemanticStyle(semanticToneValue, semanticWarmthValue, { selectTone: false });
+  }
+  refresh();
+  updateFocusPrompt();
+  saveSession();
+  renderFilm();
+  announce(message);
+}
 
 function openFilm(id) {
   camera.preview(null);
-  selectedCapture = id || selectedCapture || allCaptures().at(-1)?.id;
+  selectedCapture = id || (camera.captures.some(capture => capture.id === selectedCapture) ? selectedCapture : camera.captures.at(-1)?.id);
   compareCapture = null;
   $("filmDrawer").classList.remove("hidden");
   $("filmBtn").setAttribute("aria-expanded", "true");
+  $("takeHistoryBtn").setAttribute("aria-expanded", "true");
   document.body.classList.add("film-open");
   renderFilm(); refresh();
   $("closeFilm").focus();
@@ -1464,50 +1517,73 @@ function openFilm(id) {
 function closeFilm() {
   $("filmDrawer").classList.add("hidden");
   $("filmBtn").setAttribute("aria-expanded", "false");
+  $("takeHistoryBtn").setAttribute("aria-expanded", "false");
   document.body.classList.remove("film-open");
-  $("filmBtn").focus();
+  $("takeHistoryBtn").focus();
 }
 $("filmBtn").addEventListener("click", () => $("filmDrawer").classList.contains("hidden") ? openFilm() : closeFilm());
+$("takeHistoryBtn").addEventListener("click", () => $("filmDrawer").classList.contains("hidden") ? openFilm() : closeFilm());
 $("closeFilm").addEventListener("click", closeFilm);
 $("reviewBtn").addEventListener("click", () => openFilm(camera.captures.at(-1)?.id));
 
 function renderFilm() {
-  const captures = allCaptures();
+  const captures = camera.captures;
   const list = $("filmList");
   const details = $("filmDetails");
   list.replaceChildren(); details.replaceChildren();
-  $("storageNote").textContent = storageAvailable ? "Saved in this browser. Captures keep their original wording." : "Session only: browser storage is unavailable.";
+  $("storageNote").textContent = storageAvailable
+    ? "Saved in this browser. Reverting an earlier Take skips any wording changed by a later Take."
+    : "Session only: browser storage is unavailable.";
   if (!captures.length) {
-    details.append(node("p", "empty-film", "Your film is empty. Choose a tone and press the shutter to save a take, or capture a panorama."));
+    details.append(node("p", "empty-film", "No Takes yet. Preview a change, then press Shutter to capture it."));
     return;
   }
   captures.forEach(c => {
+    const state = takeState(c);
+    const manualCount = c.changes.filter(change => change.afterCustomText !== null && change.afterCustomText !== undefined).length;
     const b = button("", `film-thumbnail${selectedCapture === c.id ? " active" : ""}`, () => { selectedCapture = c.id; compareCapture = null; renderFilm(); });
-    b.append(node("span", "micro-label", c.kind === "pano" ? "PANORAMA" : "CAPTURE"), node("strong", "", c.id), node("small", "", c.kind === "pano" ? `${c.sentenceIds.length} sentences` : `${toneTreatments[c.tone].label} · ${c.changes.length} changes`));
+    b.append(node("span", `take-status ${state.className}`, state.label), node("strong", "", `TAKE ${c.id}`),
+      node("small", "", `${c.changes.length} change${c.changes.length === 1 ? "" : "s"}${manualCount ? ` · ${manualCount} direct` : ""}`));
     b.setAttribute("aria-pressed", String(selectedCapture === c.id));
     b.setAttribute("aria-label", captureName(c));
     list.append(b);
   });
-  const capture = captureById(selectedCapture) || captures.at(-1);
+  const capture = captures.find(item => item.id === selectedCapture) || captures.at(-1);
+  selectedCapture = capture.id;
+  const state = takeState(capture);
+  const styleLabel = capture.tone ? toneTreatments[capture.tone]?.label || capture.tone : "Direct edit";
+  const capturedAt = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(capture.createdAt));
   details.append(node("h3", "", captureName(capture)));
-  if (capture.kind === "pano") {
-    details.append(node("p", "capture-meta", `${capture.startId.toUpperCase()} → ${capture.endId.toUpperCase()} · ${capture.sentenceIds.length} sentences · Example summary`), node("p", "pano-saved-summary", capture.summary));
-    capture.steps.forEach(step => {
-      const row = node("div", "review-row");
-      row.append(node("strong", "", step.label), node("p", "", step.summary));
-      details.append(row);
+  const summary = node("div", "take-summary");
+  summary.append(node("span", `take-status ${state.className}`, state.label),
+    node("span", "", `${capture.changes.length} captured`),
+    node("span", "", `${state.applied} current`),
+    node("span", "", `${state.reverted} reverted`),
+    node("span", "", `${state.superseded} changed later`));
+  details.append(summary);
+  details.append(node("p", "capture-meta", `${capture.focusId.toUpperCase()} · ${intentLabels[capture.focusIssue]} · ${capture.frame} frame · ${apertureInfo(capture.aperture).depth} focus · ${styleLabel}`));
+  details.append(node("p", "capture-meta", capturedAt));
+  const tools = node("div", "take-actions");
+  if (state.applied) {
+    const revertTake = button(`Revert ${state.applied} current`, "camera-button", () => {
+      const result = camera.revertCapture(capture.id);
+      if (!result) return;
+      const skipped = result.blockedIds?.length || 0;
+      refreshAfterTakeHistoryAction(`Take ${capture.id}: ${result.sentenceIds.length} passage${result.sentenceIds.length === 1 ? "" : "s"} reverted.${skipped ? ` ${skipped} later change${skipped === 1 ? " was" : "s were"} kept.` : ""}`);
     });
-    return;
+    revertTake.setAttribute("aria-label", `Safely revert current wording from Take ${capture.id}`);
+    tools.append(revertTake);
   }
-  details.append(node("p", "capture-meta", `${capture.focusId.toUpperCase()} · ${intentLabels[capture.focusIssue]} · ${capture.frame} · ${apertureInfo(capture.aperture).depth} depth`));
-  details.append(node("p", "capture-meta", `Captured ${capture.includedIds.map(id => id.toUpperCase()).join(", ")}. ${capture.changes.length} wording changes.`));
-  const tools = node("div", "film-tools");
-  const restore = button("Restore this take", "camera-button", () => {
-    const result = camera.restoreCapture(capture.id);
-    if (result) { announce(`Restored take ${capture.id}. Other sentences were kept.`); refresh(); saveSession(); renderFilm(); }
-  });
-  restore.disabled = capture.changes.every(change => camera.text(change.id, { committed: true }) === change.after);
-  tools.append(restore);
+  if (state.reverted) {
+    const reapplyTake = button(`Reapply ${state.reverted} reverted`, "camera-button", () => {
+      const result = camera.reapplyCapture(capture.id);
+      if (!result) return;
+      const skipped = result.blockedIds?.length || 0;
+      refreshAfterTakeHistoryAction(`Take ${capture.id}: ${result.sentenceIds.length} passage${result.sentenceIds.length === 1 ? "" : "s"} reapplied.${skipped ? ` ${skipped} later change${skipped === 1 ? " was" : "s were"} kept.` : ""}`);
+    });
+    reapplyTake.setAttribute("aria-label", `Safely reapply reverted wording from Take ${capture.id}`);
+    tools.append(reapplyTake);
+  }
   const others = camera.captures.filter(c => c.id !== capture.id);
   if (others.length) {
     const label = node("label", "compare-label", "Compare with ");
@@ -1521,20 +1597,30 @@ function renderFilm() {
   }
   details.append(tools);
   if (compareCapture) { renderComparison(details, capture, captureById(compareCapture)); return; }
-  details.append(node("p", "review-explainer", "Each status shows whether this captured wording is still in the manuscript. Revert an applied sentence, or restore the whole take."));
+  details.append(node("p", "review-explainer", "CURRENT matches this Take. REVERTED matches the wording from before it. CHANGED LATER is protected from this Take's actions."));
   capture.changes.forEach(change => {
     const row = node("article", "review-row");
     const status = camera.changeStatus(capture.id, change.id);
+    const statusLabel = status === "applied" ? "CURRENT" : status === "reverted" ? "REVERTED" : "CHANGED LATER";
+    const statusClass = status === "applied" ? "current" : status === "reverted" ? "reverted" : "superseded";
     const head = node("div", "review-row-head");
-    head.append(node("strong", "", change.id.toUpperCase()), node("span", "change-status", status));
+    head.append(node("strong", "", change.id.toUpperCase()), node("span", `take-status ${statusClass}`, statusLabel));
     row.append(head, node("span", "micro-label", "BEFORE"), node("p", "before", change.before), node("span", "micro-label", "CAPTURED"), node("p", "after", change.after));
-    const revert = button("Revert this sentence", "text-button", () => {
-      if (camera.revertChange(capture.id, change.id)) { announce(`${change.id.toUpperCase()} reverted. Undo is available.`); refresh(); saveSession(); renderFilm(); }
-    });
-    revert.disabled = status !== "applied";
-    revert.setAttribute("aria-label", `Revert ${change.id.toUpperCase()} from take ${capture.id}`);
-    row.append(revert);
-    if (status === "superseded") row.append(node("small", "review-explainer", "A later edit changed this sentence."));
+    if (status === "applied") {
+      const revert = button("Revert this sentence", "text-button", () => {
+        if (camera.revertChange(capture.id, change.id)) refreshAfterTakeHistoryAction(`${change.id.toUpperCase()} reverted. Later wording was not touched.`);
+      });
+      revert.setAttribute("aria-label", `Revert ${change.id.toUpperCase()} from take ${capture.id}`);
+      row.append(revert);
+    } else if (status === "reverted") {
+      const reapply = button("Reapply this sentence", "text-button", () => {
+        if (camera.reapplyChange(capture.id, change.id)) refreshAfterTakeHistoryAction(`${change.id.toUpperCase()} reapplied from Take ${capture.id}.`);
+      });
+      reapply.setAttribute("aria-label", `Reapply ${change.id.toUpperCase()} from take ${capture.id}`);
+      row.append(reapply);
+    } else {
+      row.append(node("small", "take-warning", "A later Take changed this sentence, so this action is locked. Compare the wording before changing it manually."));
+    }
     details.append(row);
   });
 }
@@ -1553,16 +1639,163 @@ function renderComparison(container, left, right) {
   });
 }
 
-renderLayer(baseLayer, true);
-const pano = new PanoCamera({ editor, baseLayer, model, onChange: () => {} });
-function setMode(nextMode) {
-  if (mode === nextMode) return;
-  camera.preview(null);
-  mode = nextMode;
-  editingFrame = false;
-  if (mode === "pano") pano.enter(camera.focusId);
-  else pano.exit();
+function renderPanoWorkspace() {
+  if (!panoOpen || !pano) return;
+  const snapshot = pano.snapshot();
+  const selected = new Set(snapshot.sentenceIds);
+  const passages = $("panoPassages");
+  passages.replaceChildren();
+  model.sections.forEach(section => {
+    const sectionElement = node("section", "pano-section");
+    sectionElement.append(node("h3", "", section.title));
+    section.paragraphs.forEach(paragraph => {
+      const paragraphElement = node("div", "pano-paragraph");
+      paragraph.forEach(item => {
+        const passage = button(camera.text(item.id, { committed: true }), "pano-passage", () => {
+          panoRecentCapture = null;
+          if (panoChoosingStart) {
+            panoChoosingStart = false;
+            pano.setStart(item.id);
+            announce(`${item.id.toUpperCase()} is now the panorama start. Choose an endpoint.`);
+          } else {
+            pano.selectEnd(item.id);
+            announce(`Panorama now runs from ${pano.startId.toUpperCase()} to ${item.id.toUpperCase()}.`);
+          }
+          renderPanoWorkspace();
+        });
+        passage.dataset.id = item.id;
+        passage.dataset.idLabel = item.id.toUpperCase();
+        passage.classList.toggle("in-range", selected.has(item.id));
+        passage.classList.toggle("is-start", item.id === pano.startId);
+        passage.classList.toggle("is-end", item.id === pano.endId);
+        passage.setAttribute("aria-pressed", String(selected.has(item.id)));
+        passage.setAttribute("aria-label", `${item.id.toUpperCase()}. ${camera.text(item.id, { committed: true })}. ${panoChoosingStart ? "Set as panorama start" : "Set as panorama endpoint"}.`);
+        paragraphElement.append(passage);
+      });
+      sectionElement.append(paragraphElement);
+    });
+    passages.append(sectionElement);
+  });
+
+  const count = snapshot.sentenceIds.length;
+  const start = pano.startId?.toUpperCase() || "—";
+  const end = pano.endId?.toUpperCase() || "—";
+  $("panoRangeTitle").textContent = panoChoosingStart ? "Choose a new starting passage" : `Start ${start} · End ${end}`;
+  $("panoRangeHint").textContent = panoChoosingStart
+    ? "The next passage you choose becomes Start."
+    : "Click any passage to move End; the range remains continuous.";
+  $("panoChooseStart").setAttribute("aria-pressed", String(panoChoosingStart));
+  $("panoChooseStart").textContent = panoChoosingStart ? "Cancel start selection" : "Choose new start";
+  $("panoInsightTitle").textContent = `${count} passage${count === 1 ? "" : "s"} · ${snapshot.steps.length} argument step${snapshot.steps.length === 1 ? "" : "s"}`;
+  $("panoSynthesis").textContent = snapshot.summary || "Choose an endpoint to build a synthesis of the argument in view.";
+  $("panoArgumentSteps").replaceChildren(...snapshot.steps.map((step, index) => {
+    const item = node("li", "pano-argument-step");
+    const copy = node("div", "");
+    copy.append(node("strong", "", step.label), node("p", "", step.summary));
+    item.append(node("b", "", String(index + 1).padStart(2, "0")), copy);
+    return item;
+  }));
+
+  const saved = $("panoSavedList");
+  saved.replaceChildren();
+  if (!panoCaptures.length) saved.append(node("span", "pano-saved-empty", "No panoramas captured yet."));
+  panoCaptures.forEach(capture => {
+    const savedCard = button(`${capture.id} · ${capture.startId.toUpperCase()}–${capture.endId.toUpperCase()} · ${capture.sentenceIds.length}`, "pano-saved-card", () => {
+      panoRecentCapture = capture;
+      panoChoosingStart = false;
+      pano.setStart(capture.startId);
+      pano.selectEnd(capture.endId);
+      pano.captured = true;
+      pano.refresh();
+      renderPanoWorkspace();
+      announce(`Loaded panorama ${capture.id}.`);
+    });
+    savedCard.setAttribute("aria-label", `Load saved panorama ${capture.id}, ${capture.startId.toUpperCase()} through ${capture.endId.toUpperCase()}`);
+    saved.append(savedCard);
+  });
+
+  $("panoCapture").disabled = count < 2 || panoChoosingStart || !!panoRecentCapture;
+  $("panoCaptureCount").textContent = panoRecentCapture
+    ? `Saved as ${panoRecentCapture.id}`
+    : count < 2 ? "Choose a wider range" : `Capture ${count} passages`;
+  $("panoCaptureNote").textContent = panoRecentCapture
+    ? `PANO ${panoRecentCapture.id} CAPTURED · ${count} passages`
+    : `${count} passage${count === 1 ? "" : "s"} in view · document unchanged`;
+  $("panoStatus").innerHTML = panoRecentCapture
+    ? `<i></i> PANO ${panoRecentCapture.id} saved · ${start}–${end}`
+    : `<i></i> ${start}–${end} · ${count} passage${count === 1 ? "" : "s"} · Live synthesis`;
+}
+
+function enterPanoWorkspace() {
+  if (panoOpen || semanticOpen) return;
+  documentScrollTop = editor.scrollTop;
+  const startId = selectedDocumentId || sentences[0]?.id;
+  selectedDocumentId = null;
+  inlineRevisionId = null;
+  updateFocusPrompt();
+  mode = "pano";
+  panoOpen = true;
+  panoChoosingStart = false;
+  panoRecentCapture = null;
+  camera.discardPreview();
+  pano.enter(startId);
+  renderPanoWorkspace();
   refresh();
+  announce(`Panoramic reading opened at ${pano.startId.toUpperCase()}. Choose an endpoint. The document will not be modified.`);
+  requestAnimationFrame(() => $("exitPano").focus({ preventScroll: true }));
+}
+
+function exitPanoWorkspace() {
+  if (!panoOpen) return;
+  panoOpen = false;
+  panoChoosingStart = false;
+  panoRecentCapture = null;
+  mode = "focus";
+  pano.exit();
+  refresh();
+  requestAnimationFrame(() => {
+    editor.scrollTop = documentScrollTop;
+    editor.focus({ preventScroll: true });
+  });
+  announce("Returned to the document. The panorama did not modify any text.");
+}
+
+$("panoEntryBtn").addEventListener("click", enterPanoWorkspace);
+$("exitPano").addEventListener("click", exitPanoWorkspace);
+$("panoChooseStart").addEventListener("click", () => {
+  panoChoosingStart = !panoChoosingStart;
+  panoRecentCapture = null;
+  renderPanoWorkspace();
+  announce(panoChoosingStart ? "Choose a passage to use as the new panorama start." : "Start selection cancelled.");
+});
+$("panoResetRange").addEventListener("click", () => {
+  panoChoosingStart = false;
+  panoRecentCapture = null;
+  pano.setStart(pano.startId || sentences[0].id);
+  renderPanoWorkspace();
+  announce("Panorama reset to its starting passage.");
+});
+$("panoCapture").addEventListener("click", () => {
+  if ($("panoCapture").disabled) return;
+  const snapshot = pano.capture();
+  if (!snapshot) return;
+  snapshot.id = `P${String(Math.max(0, ...panoCaptures.map(capture => Number(capture.id.slice(1)))) + 1).padStart(2, "0")}`;
+  panoCaptures.push(snapshot);
+  panoRecentCapture = snapshot;
+  $("panoCaptureBar").classList.remove("is-captured");
+  void $("panoCaptureBar").offsetWidth;
+  $("panoCaptureBar").classList.add("is-captured");
+  saveSession();
+  refresh();
+  renderPanoWorkspace();
+  announce(`Panorama ${snapshot.id} captured. ${snapshot.sentenceIds.length} passages saved. No text was modified.`);
+});
+
+renderLayer(baseLayer, true);
+const pano = new PanoCamera({ editor, baseLayer, model, onChange: () => { if (panoOpen) renderPanoWorkspace(); } });
+function setMode(nextMode) {
+  if (nextMode === "pano") enterPanoWorkspace();
+  else if (panoOpen) exitPanoWorkspace();
 }
 $("focusModeBtn").addEventListener("click", () => setMode("focus"));
 $("panoModeBtn").addEventListener("click", () => setMode("pano"));

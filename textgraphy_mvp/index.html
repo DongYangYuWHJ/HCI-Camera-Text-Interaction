@@ -67,6 +67,12 @@
         </div>
         <span id="spaceLabel" class="space-label"><i></i> DOCUMENT SPACE</span>
         <span class="demo-label" title="This prototype uses a prepared manuscript, relatedness scores and wording examples. No AI service is connected.">EXAMPLE MANUSCRIPT</span>
+        <button id="panoEntryBtn" class="pano-entry-button" type="button" aria-expanded="false" aria-controls="panoWorkspace">
+          PANO <b id="panoHistoryCount">00</b>
+        </button>
+        <button id="takeHistoryBtn" class="take-history-button" type="button" aria-expanded="false" aria-controls="filmDrawer">
+          TAKES <b id="takeHistoryCount">00</b>
+        </button>
         <div class="session-actions">
           <button id="undoBtn" type="button" class="text-button" disabled>Undo</button>
           <button id="redoBtn" type="button" class="text-button" disabled>Redo</button>
@@ -285,17 +291,72 @@
             </section>
             <div id="semanticCards" class="semantic-cards" aria-live="polite"></div>
             <div id="semanticCommitBar" class="semantic-action-capsule hidden" role="region" aria-label="Preview actions">
-              <span><i aria-hidden="true"></i><b id="semanticCommitNote">Document not changed yet</b></span>
+              <span><i aria-hidden="true"></i><b id="semanticCommitNote">Preview ready · document unchanged</b></span>
               <button id="semanticCancelPreview" class="semantic-action-secondary" type="button">Cancel</button>
-              <button id="semanticApplyPreview" class="semantic-apply-preview" type="button">Apply changes</button>
+              <button id="semanticApplyPreview" class="semantic-shutter" type="button"
+                aria-label="Shutter. Capture the visible preview as a new take.">
+                <span class="semantic-shutter-icon" aria-hidden="true"><i></i></span>
+                <span class="semantic-shutter-copy"><b>SHUTTER</b><small id="semanticShutterCount">Capture changes</small></span>
+              </button>
             </div>
-            <div id="semanticUndoBar" class="semantic-action-capsule semantic-undo-capsule hidden" role="status">
-              <span><i aria-hidden="true"></i><b id="semanticUndoNote">Changes applied</b></span>
+            <div id="semanticUndoBar" class="semantic-action-capsule semantic-undo-capsule hidden" role="status" aria-live="polite">
+              <span><i aria-hidden="true"></i><b id="semanticUndoNote">Take captured</b></span>
               <button id="semanticUndoApply" class="semantic-action-secondary" type="button">Undo</button>
             </div>
             <footer class="semantic-footer">
               <span id="semanticStatus"><i></i> Gathering passages from the manuscript…</span>
               <strong id="semanticSafetyState">REVIEW ONLY · NO TEXT MODIFIED</strong>
+            </footer>
+          </section>
+
+          <section id="panoWorkspace" class="pano-workspace" aria-labelledby="panoTitle" aria-hidden="true">
+            <header class="pano-workspace-head">
+              <div>
+                <span class="pano-workspace-kicker"><i></i> PANORAMIC READING</span>
+                <h2 id="panoTitle">Trace a continuous argument</h2>
+                <p>Choose an endpoint in the manuscript. Everything between Start and End stays in view.</p>
+              </div>
+              <button id="exitPano" class="back-document" type="button">← Back to document</button>
+            </header>
+            <div class="pano-workspace-body">
+              <section class="pano-manuscript" aria-labelledby="panoRangeTitle">
+                <header class="pano-range-head">
+                  <div>
+                    <span class="micro-label">CONTINUOUS RANGE</span>
+                    <strong id="panoRangeTitle">Start S1 · End S1</strong>
+                    <small id="panoRangeHint">Click a passage to extend the panorama.</small>
+                  </div>
+                  <button id="panoChooseStart" type="button">Choose new start</button>
+                </header>
+                <div id="panoPassages" class="pano-passages"></div>
+              </section>
+              <aside class="pano-insight" aria-labelledby="panoInsightTitle">
+                <div class="pano-insight-head">
+                  <span class="micro-label">ARGUMENT IN VIEW</span>
+                  <strong id="panoInsightTitle">One passage selected</strong>
+                </div>
+                <ol id="panoArgumentSteps" class="pano-argument-steps"></ol>
+                <section class="pano-synthesis" aria-labelledby="panoSynthesisTitle">
+                  <span id="panoSynthesisTitle" class="micro-label">EXAMPLE SYNTHESIS</span>
+                  <p id="panoSynthesis"></p>
+                </section>
+                <section class="pano-saved" aria-labelledby="panoSavedTitle">
+                  <span id="panoSavedTitle" class="micro-label">SAVED PANORAMAS</span>
+                  <div id="panoSavedList" class="pano-saved-list"></div>
+                </section>
+              </aside>
+            </div>
+            <div id="panoCaptureBar" class="pano-capture-bar" role="region" aria-label="Panorama capture">
+              <span><i aria-hidden="true"></i><b id="panoCaptureNote">Range ready · document unchanged</b></span>
+              <button id="panoResetRange" class="semantic-action-secondary" type="button">Reset</button>
+              <button id="panoCapture" class="semantic-shutter" type="button" aria-label="Shutter. Save this panorama.">
+                <span class="semantic-shutter-icon" aria-hidden="true"><i></i></span>
+                <span class="semantic-shutter-copy"><b>SHUTTER</b><small id="panoCaptureCount">Capture panorama</small></span>
+              </button>
+            </div>
+            <footer class="pano-workspace-footer">
+              <span id="panoStatus"><i></i> Select an endpoint to trace the argument.</span>
+              <strong>OBSERVATION ONLY · NO TEXT MODIFIED</strong>
             </footer>
           </section>
         </div>
@@ -319,8 +380,8 @@
   </div>
 
   <aside id="filmDrawer" class="film-drawer hidden" aria-labelledby="filmTitle">
-    <header class="film-head"><div><span class="micro-label">YOUR CAPTURES</span><h2 id="filmTitle">Film</h2></div><button id="closeFilm" class="camera-button" type="button">Back to camera</button></header>
-    <p id="storageNote" class="storage-note">Saved in this browser.</p>
+    <header class="film-head"><div><span class="micro-label">FILM · SAFE HISTORY</span><h2 id="filmTitle">Take history</h2></div><button id="closeFilm" class="camera-button" type="button">Close</button></header>
+    <p id="storageNote" class="storage-note">Saved in this browser. Earlier Takes never overwrite later wording.</p>
     <div id="filmList" class="film-list"></div>
     <div id="filmDetails" class="film-details"></div>
   </aside>

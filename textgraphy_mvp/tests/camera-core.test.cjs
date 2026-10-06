@@ -257,6 +257,46 @@ test("selective review protects later edits and is undoable", () => {
   assert.equal(state.changeStatus(second.id, "s1"), "reverted");
 });
 
+test("whole-take revert and reapply skip sentences changed by later takes", () => {
+  const state = camera();
+  state.focus("s1");
+  state.setAperture(100);
+  state.setTone("warm");
+  const first = state.capture();
+  state.setFrame("sentence");
+  state.setTone("clinical");
+  state.capture();
+
+  const reverted = state.revertCapture(first.id);
+  assert.deepEqual(reverted.sentenceIds, ["s3", "s4", "s5"]);
+  assert.deepEqual(reverted.blockedIds, ["s1"]);
+  assert.equal(state.text("s1"), "Clinical s1.", "a later edit must not be overwritten");
+  assert.equal(state.text("s3"), "Original three.");
+
+  const reapplied = state.reapplyCapture(first.id);
+  assert.deepEqual(reapplied.sentenceIds, ["s3", "s4", "s5"]);
+  assert.deepEqual(reapplied.blockedIds, ["s1"]);
+  assert.equal(state.text("s1"), "Clinical s1.");
+  assert.equal(state.text("s3"), "Warm s3.");
+  state.undo();
+  assert.equal(state.text("s3"), "Original three.");
+});
+
+test("a reverted sentence can be safely reapplied but a superseded sentence cannot", () => {
+  const state = camera();
+  state.focus("s1");
+  state.setTone("warm");
+  const first = state.capture();
+  assert.equal(state.revertChange(first.id, "s3"), true);
+  assert.equal(state.reapplyChange(first.id, "s3"), true);
+  assert.equal(state.text("s3"), "Warm s3.");
+  state.setFrame("sentence");
+  state.setTone("clinical");
+  state.capture();
+  assert.equal(state.reapplyChange(first.id, "s1"), false);
+  assert.equal(state.text("s1"), "Clinical s1.");
+});
+
 test("restoring a capture affects its changed sentences and preserves unrelated later work", () => {
   const state = camera();
   state.focus("s1");
