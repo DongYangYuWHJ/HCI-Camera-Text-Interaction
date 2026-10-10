@@ -3,7 +3,27 @@
 A camera-shaped interaction prototype for exploring **Semantic Depth of Field**,
 style propagation, and argument panoramas in a long-form manuscript.
 
-## Current interaction step
+## Quick start
+
+From this folder, run:
+
+```bash
+node server.cjs
+```
+
+Then open **http://127.0.0.1:4173/** in a browser. Node.js is required, but no package installation is needed.
+
+## Try the interaction
+
+1. Click a sentence in the document, then choose **Focus**.
+2. Use **Frame** to limit the document range and **Aperture** to control how many semantically related passages remain in focus.
+3. Move the **Style** point, choose which passages may change, or edit a sentence directly.
+4. Press **Shutter** to commit the visible preview as a Take; open **Takes** to compare, revert, or reapply it safely.
+5. Open **Pano**, choose a continuous range, and view or capture its short overview. Pano never modifies the document.
+
+All text generation and relevance results are prepared examples; no AI service is connected.
+
+## Interaction details
 
 - The prototype opens as a normal, readable **Document Space**, without a control-console-first workflow.
 - Clicking a sentence selects it without immediately changing modes or modifying text.
@@ -27,22 +47,6 @@ style propagation, and argument panoramas in a long-form manuscript.
 The prototype now covers the complete document-first loop: select text, gather
 semantic context, control revision scope and style, capture a safe Take, review
 history, and trace a continuous argument with Pano.
-
-## Run
-
-From this folder:
-
-```bash
-python -m http.server 8000
-```
-
-Then open:
-
-```text
-http://localhost:8000
-```
-
-No npm install is required.
 
 ## Why mock AI?
 
